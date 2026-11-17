@@ -6,11 +6,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#060d18">
+<meta name="apple-mobile-web-app-title" content="Tacho">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" href="icon.png">
 <title>GPS-Tacho</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Orbitron:wght@600;800&display=swap">
 <style>
-:root{color-scheme:dark;--bg:#060d18;--glass:rgba(16,28,48,.72);--line:rgba(255,255,255,.12);--fg:#f3f7fc;--mut:#8ea3bb;--a:#19e3c4;--b:#ffd23f;--c:#ff4d6d;
+:root{color-scheme:dark;--bg:#060d18;--glass:rgba(16,28,48,.9);--line:rgba(255,255,255,.12);--fg:#f3f7fc;--mut:#8ea3bb;--a:#19e3c4;--b:#ffd23f;--c:#ff4d6d;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -21,7 +24,28 @@ body{margin:0;height:100%;background:radial-gradient(120% 70% at 50% 0%,#12305a 
 .seg button{font:inherit;font-size:1.15rem;font-weight:600;color:var(--mut);background:none;border:0;border-radius:999px;padding:7px 18px;cursor:pointer;transition:background .2s,color .2s}
 .seg button[aria-pressed="true"]{background:var(--fg);color:#08162a}
 .stage{position:relative;flex:1;min-height:0;border-radius:24px;overflow:hidden}
-#v-tacho{height:100%;display:flex;align-items:center;justify-content:center}
+#v-tacho{position:relative;height:100%;display:flex;align-items:center;justify-content:center}
+.designs{flex:1;height:100%;min-width:0;padding:0 4px 50px}
+.d{display:none;width:100%;height:100%;align-items:center;justify-content:center}
+.d.on{display:flex}
+.full{width:100%;height:100%;display:block}
+.nav{position:absolute;bottom:0;z-index:5;width:42px;height:42px;border-radius:50%;background:var(--glass);border:1px solid var(--line);color:var(--fg);font:inherit;font-size:1.9rem;line-height:1;padding:0 0 3px;cursor:pointer}
+#prev{left:2px}#next{right:2px}
+.dots{position:absolute;bottom:0;height:42px;left:56px;right:56px;display:flex;gap:6px;align-items:center;justify-content:center;pointer-events:none}
+.dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.25)}
+.dots i.on{background:var(--fg)}
+.dots span{margin-left:8px;color:var(--mut);font-size:1rem}
+.led{width:100%;text-align:center}
+.bar{display:grid;grid-template-columns:repeat(24,1fr);gap:3px;height:40px;width:84%;margin:0 auto 26px}
+.bar i{display:block;border-radius:3px;background:hsl(var(--h),85%,55%);opacity:.14;transition:opacity .2s}
+.bar i.on{opacity:1;box-shadow:0 0 10px hsl(var(--h),85%,55%)}
+.lnum{font-family:Orbitron,"Barlow Condensed",monospace;font-weight:800;font-size:min(22vw,6.5rem);line-height:1;color:#a8ffe6;text-shadow:0 0 22px rgba(25,227,196,.6);font-variant-numeric:tabular-nums}
+.lunit{font-family:Orbitron,sans-serif;font-weight:600;font-size:1.1rem;color:var(--mut);margin-top:10px;letter-spacing:.12em}
+.min{width:100%;text-align:center}
+.mnum{font-size:min(46vw,12rem);font-weight:700;line-height:.82;font-variant-numeric:tabular-nums;transition:color .4s}
+.munit{font-size:1.6rem;color:var(--mut);margin-top:6px}
+.mtrack{height:6px;border-radius:3px;background:rgba(255,255,255,.1);margin:24px 10% 0;overflow:hidden}
+.mfill{height:100%;width:0;border-radius:3px;transition:width .4s,background .4s}
 #v-map{position:absolute;inset:0;display:none;border:1px solid var(--line);border-radius:24px}
 .gauge{position:relative;width:100%;max-height:100%;aspect-ratio:300/270}
 .gauge svg{width:100%;height:100%;display:block;overflow:visible}
@@ -34,6 +58,7 @@ body{margin:0;height:100%;background:radial-gradient(120% 70% at 50% 0%,#12305a 
 .chip b{font-size:2.6rem;line-height:1;font-weight:700;font-variant-numeric:tabular-nums}
 .chip span{color:var(--mut);font-size:1.2rem}
 #center{position:absolute;z-index:500;right:12px;bottom:12px;font:inherit;font-size:1.1rem;font-weight:600;color:#08162a;background:var(--fg);border:0;border-radius:999px;padding:8px 16px;display:none;cursor:pointer}
+#layer{position:absolute;z-index:500;right:12px;top:12px;font:inherit;font-size:1.1rem;font-weight:600;color:var(--fg);background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(10px);border-radius:999px;padding:8px 16px;display:none;cursor:pointer}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);background:var(--glass);border:1px solid var(--line);border-radius:18px;backdrop-filter:blur(10px)}
 .stats div{padding:9px 6px;text-align:center}
 .stats div+div{border-left:1px solid var(--line)}
@@ -56,6 +81,8 @@ button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
 .rec small{color:var(--mut);font-size:1rem}
 .rec em{flex:1;font-style:normal;color:var(--mut);font-size:.95rem;text-align:right}
 .rec button{font:inherit;font-size:.95rem;color:var(--mut);background:none;border:1px solid var(--line);border-radius:10px;padding:3px 10px;cursor:pointer}
+.seg,.chip,.stats,.rec,#layer{backdrop-filter:none;-webkit-backdrop-filter:none}
+#v-map{transform:translateZ(0)}
 @media (prefers-reduced-motion:reduce){.arc{transition:none}}
 </style>
 </head>
@@ -74,6 +101,9 @@ button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
 
   <div class="stage">
     <div id="v-tacho">
+      <button class="nav" id="prev" aria-label="Vorheriges Design">‹</button>
+      <div class="designs">
+        <div class="d on">
       <div class="gauge">
         <svg viewBox="0 0 300 270" aria-hidden="true">
           <defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="40" y1="0" x2="260" y2="0">
@@ -86,8 +116,24 @@ button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
         <div class="read"><div class="num" id="num">0</div><div class="unit" id="unit">km/h</div></div>
       </div>
     </div>
+        <div class="d"><svg class="full" viewBox="0 0 300 300" aria-hidden="true">
+          <defs><radialGradient id="face" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#16294a"/><stop offset="1" stop-color="#050b14"/></radialGradient></defs>
+          <circle cx="150" cy="150" r="146" fill="url(#face)" stroke="rgba(255,255,255,.2)" stroke-width="3"/>
+          <g id="ring"></g><g id="ticks"></g>
+          <text id="cnum2" x="150" y="214" text-anchor="middle" font-size="58" font-weight="700" fill="#f3f7fc">0</text>
+          <text id="cunit2" x="150" y="238" text-anchor="middle" font-size="16" fill="#8ea3bb">km/h</text>
+          <g id="needle" transform="rotate(-135 150 150)"><polygon points="146.5,150 153.5,150 150,32" fill="#ff4d4d"/><polygon points="148,150 152,150 150,32" fill="#ff9a9a"/></g>
+          <circle cx="150" cy="150" r="11" fill="#0b1626" stroke="#ff4d4d" stroke-width="3"/>
+        </svg></div>
+        <div class="d"><div class="led"><div class="bar" id="bar"></div><div class="lnum" id="lnum">0</div><div class="lunit" id="lunit">km/h</div></div></div>
+        <div class="d"><div class="min"><div class="mnum" id="mnum">0</div><div class="munit" id="munit">km/h</div><div class="mtrack"><div class="mfill" id="mfill"></div></div></div></div>
+      </div>
+      <button class="nav" id="next" aria-label="Nächstes Design">›</button>
+      <div class="dots" id="dots"></div>
+    </div>
     <div id="v-map"></div>
     <div class="chip" id="chip" style="display:none"><b id="cnum">0</b><span id="cunit">km/h</span></div>
+    <button id="layer">Straße</button>
     <button id="center">Zentrieren</button>
   </div>
 
@@ -110,6 +156,9 @@ button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
 (function(){
   var $=function(i){return document.getElementById(i)};
   var unit='kmh',watchId=null,wake=null,follow=true,view='tacho';
+  var design=0,needleCur=-135,needleTar=-135,raf=null,leds=[];
+  var NAMES=['Klassisch','Auto','Digital','Minimal'];
+  try{design=(parseInt(localStorage.getItem('tacho_design'),10)||0)%4}catch(e){}
   var S={max:0,dist:0,moving:0,last:null,speed:0};
   var F={kmh:3.6,mph:2.236936},SCALE={kmh:200,mph:125};
   var rec={v:0,d:0};
@@ -117,11 +166,12 @@ button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
   function saveRec(){try{localStorage.setItem('tacho_rekord',JSON.stringify(rec))}catch(e){}}
 
   /* Karte (Satellit) */
-  var map=null,me,acc,track,hasPos=false;
+  var map=null,me,acc,track,hasPos=false,satL,labL,osmL,isSat=true,lastMap=null,lastTrk=null,nTrk=0,accR=0;
   if(window.L){
-    map=L.map('v-map',{zoomControl:false}).setView([51.1,10.4],5);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Bilder © Esri, Maxar, Earthstar Geographics'}).addTo(map);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(map);
+    map=L.map('v-map',{zoomControl:false,fadeAnimation:false,markerZoomAnimation:false}).setView([51.1,10.4],5);
+    satL=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,keepBuffer:4,updateWhenZooming:false,attribution:'Bilder © Esri, Maxar, Earthstar Geographics'}).addTo(map);
+    labL=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,keepBuffer:4,updateWhenZooming:false}).addTo(map);
+    osmL=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:4,updateWhenZooming:false,attribution:'© OpenStreetMap-Mitwirkende'});
     track=L.polyline([],{color:'#ffd23f',weight:4,opacity:.9}).addTo(map);
     acc=L.circle([0,0],{radius:1,stroke:false,fillColor:'#19e3c4',fillOpacity:.18});
     me=L.circleMarker([0,0],{radius:9,color:'#fff',weight:3,fillColor:'#19e3c4',fillOpacity:1});
@@ -135,8 +185,9 @@ button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
     $('v-tacho').style.display=v==='tacho'?'flex':'none';
     $('v-map').style.display=v==='map'?'block':'none';
     $('chip').style.display=v==='map'?'flex':'none';
+    $('layer').style.display=v==='map'?'block':'none';
     $('center').style.display=(v==='map'&&!follow)?'block':'none';
-    if(v==='map'&&map){setTimeout(function(){map.invalidateSize();if(hasPos&&follow)map.setView(me.getLatLng(),Math.max(map.getZoom(),17))},60)}
+    if(v==='map'&&map){setTimeout(function(){map.invalidateSize();if(hasPos&&follow)map.setView(me.getLatLng(),Math.max(map.getZoom(),17),{animate:false});lastMap=null},60)}
   }
 
   function fmt(ms){return Math.round(ms*F[unit])}
@@ -146,11 +197,50 @@ button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
   function say(t,err){var m=$('msg');m.textContent=t;m.className=err?'err':''}
   function mmss(s){s=Math.floor(s);var h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60,p=function(n){return String(n).padStart(2,'0')};return(h?h+':':'')+p(m)+':'+p(x)}
 
+  function pt(r,a){var t=a*Math.PI/180;return[150+r*Math.sin(t),150-r*Math.cos(t)]}
+  function arcP(r,a1,a2){var p=pt(r,a1),q=pt(r,a2);return'M'+p[0].toFixed(1)+' '+p[1].toFixed(1)+' A'+r+' '+r+' 0 '+(a2-a1>180?1:0)+' 1 '+q[0].toFixed(1)+' '+q[1].toFixed(1)}
+  function buildCar(){
+    var sc=SCALE[unit],step=unit==='kmh'?20:25,t='';
+    $('ring').innerHTML='<path d="'+arcP(129,-135,135)+'" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="6"/><path d="'+arcP(129,-135+270*0.8,135)+'" fill="none" stroke="#ff4d6d" stroke-width="6"/>';
+    for(var x=0;x<=sc+0.01;x+=step/4){
+      var major=Math.abs(x/step-Math.round(x/step))<0.01,a=-135+270*x/sc,p=pt(major?104:112,a),q=pt(122,a);
+      t+='<line x1="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" x2="'+q[0].toFixed(1)+'" y2="'+q[1].toFixed(1)+'" stroke="'+(major?'#f3f7fc':'rgba(255,255,255,.4)')+'" stroke-width="'+(major?3:1.5)+'"/>';
+      if(major){var l=pt(86,a);t+='<text x="'+l[0].toFixed(1)+'" y="'+(l[1]+5).toFixed(1)+'" text-anchor="middle" font-size="15" fill="#c9d6e6">'+Math.round(x)+'</text>'}
+    }
+    $('ticks').innerHTML=t;
+  }
+  function buildLeds(){var h='';for(var i=0;i<24;i++)h+='<i style="--h:'+Math.round(165-165*i/23)+'"></i>';$('bar').innerHTML=h;leds=$('bar').children}
+  function animNeedle(){
+    needleCur+=(needleTar-needleCur)*0.2;
+    if(Math.abs(needleTar-needleCur)<0.05)needleCur=needleTar;
+    $('needle').setAttribute('transform','rotate('+needleCur.toFixed(2)+' 150 150)');
+    raf=needleCur!==needleTar?requestAnimationFrame(animNeedle):null;
+  }
+  function rd(v,u){
+    var f=Math.min(1,v/SCALE[unit]);
+    $('cnum2').textContent=v;$('cunit2').textContent=u;
+    needleTar=-135+270*f;if(design===1&&!raf)raf=requestAnimationFrame(animNeedle);
+    $('lnum').textContent=v;$('lunit').textContent=u;
+    if(design===2){var n=Math.round(f*24);for(var i=0;i<24;i++)leds[i].className=i<n?'on':''}
+    var col='hsl('+Math.round(165-165*f)+',85%,58%)';
+    $('mnum').textContent=v;$('munit').textContent=u;$('mnum').style.color=col;
+    $('mfill').style.width=(f*100)+'%';$('mfill').style.background=col;
+  }
+  function setDesign(i){
+    design=(i+4)%4;
+    var ds=document.querySelectorAll('.d'),h='',k;
+    for(k=0;k<ds.length;k++)ds[k].classList.toggle('on',k===design);
+    for(k=0;k<4;k++)h+='<i'+(k===design?' class="on"':'')+'></i>';
+    $('dots').innerHTML=h+'<span>'+NAMES[design]+'</span>';
+    try{localStorage.setItem('tacho_design',design)}catch(e){}
+    render();
+  }
   function render(){
     var v=fmt(S.speed),u=unit==='kmh'?'km/h':'mph';
     $('num').textContent=v;$('cnum').textContent=v;
     $('unit').textContent=u;$('cunit').textContent=u;
     $('arc').setAttribute('stroke-dashoffset',String(100-Math.min(1,v/SCALE[unit])*100));
+    rd(v,u);
     $('max').textContent=fmt(S.max);
     $('rec').textContent=fmt(rec.v);$('recu').textContent=u;
     $('recd').textContent=rec.d?'am '+new Date(rec.d).toLocaleDateString('de-DE'):'noch kein Rekord';
@@ -175,10 +265,11 @@ button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
     S.last=cur;
     if(map){
       var ll=[c.latitude,c.longitude];
-      if(!hasPos){acc.addTo(map);me.addTo(map);hasPos=true;if(view==='map')map.setView(ll,17)}
-      me.setLatLng(ll);acc.setLatLng(ll).setRadius(c.accuracy||10);
-      if(v>0&&good)track.addLatLng(ll);
-      if(follow&&view==='map')map.panTo(ll,{animate:true});
+      if(!hasPos){acc.addTo(map);me.addTo(map);hasPos=true;lastMap=null;if(view==='map')map.setView(ll,17,{animate:false})}
+      me.setLatLng(ll);acc.setLatLng(ll);
+      var ar=Math.round(c.accuracy||10);if(Math.abs(ar-accR)>5){accR=ar;acc.setRadius(ar)}
+      if(v>0&&(!lastTrk||hav({lat:lastTrk[0],lon:lastTrk[1]},cur)>5)){track.addLatLng(ll);lastTrk=ll;if(++nTrk>1500){var a=track.getLatLngs();a.shift();track.setLatLngs(a);nTrk=1500}}
+      if(follow&&view==='map'&&(!lastMap||hav({lat:lastMap[0],lon:lastMap[1]},cur)>2)){map.panTo(ll,{animate:true,duration:1,easeLinearity:1});lastMap=ll}
     }
     render();
   }
@@ -203,16 +294,26 @@ button:focus-visible{outline:3px solid var(--b);outline-offset:2px}
     render();
   }
   $('go').onclick=function(){watchId===null?start():stop()};
-  $('reset').onclick=function(){S.max=0;S.dist=0;S.moving=0;S.speed=0;S.last=null;if(track)track.setLatLngs([]);render()};
+  $('reset').onclick=function(){S.max=0;S.dist=0;S.moving=0;S.speed=0;S.last=null;if(track){track.setLatLngs([]);nTrk=0;lastTrk=null}render()};
+  $('layer').onclick=function(){
+    if(!map)return;
+    if(isSat){map.removeLayer(satL);map.removeLayer(labL);osmL.addTo(map);isSat=false;this.textContent='Satellit'}
+    else{map.removeLayer(osmL);satL.addTo(map);labL.addTo(map);isSat=true;this.textContent='Straße'}
+  };
   $('recdel').onclick=function(){if(confirm('Rekord wirklich löschen?')){rec={v:0,d:0};saveRec();render()}};
-  function setUnit(u){unit=u;$('u-kmh').setAttribute('aria-pressed',u==='kmh');$('u-mph').setAttribute('aria-pressed',u==='mph');render()}
+  function setUnit(u){unit=u;buildCar();$('u-kmh').setAttribute('aria-pressed',u==='kmh');$('u-mph').setAttribute('aria-pressed',u==='mph');render()}
   $('u-kmh').onclick=function(){setUnit('kmh')};
   $('u-mph').onclick=function(){setUnit('mph')};
   $('t-tacho').onclick=function(){setView('tacho')};
   $('t-map').onclick=function(){setView('map')};
   $('center').onclick=function(){follow=true;$('center').style.display='none';if(hasPos)map.setView(me.getLatLng(),Math.max(map.getZoom(),17))};
   document.addEventListener('visibilitychange',function(){if(!document.hidden&&watchId!==null)lock()});
-  render();
+  $('prev').onclick=function(){setDesign(design-1)};
+  $('next').onclick=function(){setDesign(design+1)};
+  var tx=null,vt=$('v-tacho');
+  vt.addEventListener('touchstart',function(e){tx=e.touches[0].clientX},{passive:true});
+  vt.addEventListener('touchend',function(e){if(tx===null)return;var dx=e.changedTouches[0].clientX-tx;tx=null;if(Math.abs(dx)>50)setDesign(design+(dx<0?1:-1))},{passive:true});
+  buildLeds();buildCar();setDesign(design);
 })();
 </script>
 </body>
