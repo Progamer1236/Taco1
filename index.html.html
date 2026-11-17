@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GPS-Tacho</title>
+<style>
+:root{--bg:#eef2f7;--fg:#0b2a4a;--mut:#5d7186;--panel:#fff;--line:#cdd7e3;--acc:#0b5cab;--onacc:#fff;--warn:#b3261e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#071a30;--fg:#f2f6fb;--mut:#93a9c0;--panel:#0d2745;--line:#1d3d63;--acc:#ffffff;--onacc:#0b2a4a;--warn:#ff8a80}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#071a30;--fg:#f2f6fb;--mut:#93a9c0;--panel:#0d2745;--line:#1d3d63;--acc:#ffffff;--onacc:#0b2a4a;--warn:#ff8a80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;min-height:100vh;display:flex;justify-content:center}
+main{width:100%;max-width:440px;padding:20px 18px 28px;display:flex;flex-direction:column;gap:18px}
+header{display:flex;justify-content:space-between;align-items:center}
+h1{margin:0;font-size:1.5rem;font-weight:600;letter-spacing:.02em}
+.units{display:flex;border:2px solid var(--line);border-radius:999px;overflow:hidden}
+.units button{font:inherit;font-size:1.05rem;font-weight:600;background:none;color:var(--mut);border:0;padding:6px 16px;cursor:pointer}
+.units button[aria-pressed="true"]{background:var(--acc);color:var(--onacc)}
+.gauge{position:relative;width:100%;aspect-ratio:1/0.82}
+.gauge svg{width:100%;height:100%;display:block}
+.track{stroke:var(--line)}
+.arc{stroke:var(--acc);transition:stroke-dashoffset .35s ease}
+.read{position:absolute;left:0;right:0;top:34%;text-align:center}
+.num{font-size:8.5rem;font-weight:700;line-height:.9;font-variant-numeric:tabular-nums}
+.unit{font-size:1.5rem;color:var(--mut);font-weight:500}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:2px solid var(--line);border-radius:14px;overflow:hidden}
+.stats div{background:var(--panel);padding:12px 16px}
+.stats dt{color:var(--mut);font-size:1.05rem}
+.stats dd{margin:0;font-size:2rem;font-weight:600;font-variant-numeric:tabular-nums}
+.stats small{font-size:1.05rem;color:var(--mut);font-weight:500}
+.row{display:flex;gap:10px}
+.row button{font:inherit;font-size:1.3rem;font-weight:600;border-radius:12px;padding:14px;cursor:pointer;border:2px solid var(--acc)}
+#go{flex:1;background:var(--acc);color:var(--onacc)}
+#reset{background:none;color:var(--fg);border-color:var(--line)}
+button:focus-visible{outline:3px solid var(--mut);outline-offset:2px}
+#msg{min-height:1.4em;margin:0;color:var(--mut);font-size:1.1rem;text-align:center}
+#msg.err{color:var(--warn)}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap">
+</head>
+<body>
+<main>
+  <header>
+    <h1>GPS-Tacho</h1>
+    <div class="units" role="group" aria-label="Einheit">
+      <button id="u-kmh" aria-pressed="true">km/h</button>
+      <button id="u-mph" aria-pressed="false">mph</button>
+    </div>
+  </header>
+
+  <div class="gauge">
+    <svg viewBox="0 0 300 246" aria-hidden="true">
+      <path class="track" d="M 40 210 A 130 130 0 1 1 260 210" fill="none" stroke-width="16" stroke-linecap="round"/>
+      <path id="arc" class="arc" d="M 40 210 A 130 130 0 1 1 260 210" fill="none" stroke-width="16" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+    </svg>
+    <div class="read" aria-live="off">
+      <div class="num" id="num">0</div>
+      <div class="unit" id="unit">km/h</div>
+    </div>
+  </div>
+
+  <dl class="stats">
+    <div><dt>Höchstwert</dt><dd><span id="max">0</span> <small class="u">km/h</small></dd></div>
+    <div><dt>Ø in Bewegung</dt><dd><span id="avg">0</span> <small class="u">km/h</small></dd></div>
+    <div><dt>Strecke</dt><dd><span id="dist">0,00</span> <small id="du">km</small></dd></div>
+    <div><dt>Fahrzeit</dt><dd id="time">00:00</dd></div>
+  </dl>
+
+  <p id="msg">Tippe auf „Messung starten“ und erlaube den Standortzugriff.</p>
+
+  <div class="row">
+    <button id="go">Messung starten</button>
+    <button id="reset">Zurücksetzen</button>
+  </div>
+</main>
+
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i)};
+  var unit='kmh', watchId=null, wake=null;
+  var S={max:0,dist:0,moving:0,last:null,speed:0};
+  var F={kmh:3.6,mph:2.236936}, SCALE={kmh:200,mph:125};
+
+  function fmtSpeed(ms){return Math.round(ms*F[unit])}
+  function hav(a,b){
+    var R=6371000,r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lon-a.lon)*r;
+    var h=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)*Math.sin(dLo/2);
+    return 2*R*Math.asin(Math.sqrt(h));
+  }
+  function say(t,err){var m=$('msg');m.textContent=t;m.className=err?'err':''}
+  function mmss(s){s=Math.floor(s);var h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60,p=function(n){return String(n).padStart(2,'0')};return (h?h+':':'')+p(m)+':'+p(x)}
+
+  function render(){
+    var v=fmtSpeed(S.speed);
+    $('num').textContent=v;
+    var frac=Math.min(1,v/SCALE[unit]);
+    $('arc').setAttribute('stroke-dashoffset',String(100-frac*100));
+    $('max').textContent=fmtSpeed(S.max);
+    var avg=S.moving>0?S.dist/S.moving:0;
+    $('avg').textContent=fmtSpeed(avg);
+    var d=unit==='kmh'?S.dist/1000:S.dist/1609.344;
+    $('dist').textContent=d.toFixed(2).replace('.',',');
+    $('du').textContent=unit==='kmh'?'km':'mi';
+    $('time').textContent=mmss(S.moving);
+    $('unit').textContent=unit==='kmh'?'km/h':'mph';
+    document.querySelectorAll('.u').forEach(function(e){e.textContent=unit==='kmh'?'km/h':'mph'});
+  }
+
+  function onPos(p){
+    var c=p.coords,t=p.timestamp/1000;
+    var cur={lat:c.latitude,lon:c.longitude,t:t};
+    var v=c.speed;
+    if(v==null||isNaN(v)){ // Fallback: aus Positionsänderung berechnen
+      v=0;
+      if(S.last&&t>S.last.t){v=hav(S.last,cur)/(t-S.last.t)}
+    }
+    if(c.accuracy&&c.accuracy>50){say('GPS-Signal schwach (±'+Math.round(c.accuracy)+' m). Gehe ins Freie.',false)}
+    else say('GPS aktiv · Genauigkeit ±'+Math.round(c.accuracy||0)+' m');
+    if(v<0.5)v=0; // Rauschen im Stand ausblenden
+    S.speed=v;
+    if(v>S.max)S.max=v;
+    if(S.last){
+      var dt=t-S.last.t;
+      if(v>0&&dt>0&&dt<10&&(!c.accuracy||c.accuracy<=50)){S.dist+=hav(S.last,cur);S.moving+=dt}
+    }
+    S.last=cur;
+    render();
+  }
+  function onErr(e){
+    var m={1:'Standortzugriff verweigert. Erlaube ihn in den Browser- oder Geräteeinstellungen.',2:'Position nicht verfügbar. Prüfe dein GPS-Signal.',3:'Zeitüberschreitung beim Abrufen der Position.'};
+    say(m[e.code]||'Unbekannter Fehler beim Abrufen der Position.',true);
+    if(e.code===1)stop();
+  }
+
+  async function lock(){try{if('wakeLock' in navigator)wake=await navigator.wakeLock.request('screen')}catch(e){}}
+  function start(){
+    if(!navigator.geolocation){say('Dieses Gerät unterstützt keine Standortabfrage.',true);return}
+    S.last=null;
+    watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+    $('go').textContent='Stoppen';
+    say('Suche GPS-Signal …');
+    lock();
+  }
+  function stop(){
+    if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}
+    if(wake){try{wake.release()}catch(e){}wake=null}
+    S.speed=0;S.last=null;
+    $('go').textContent='Messung starten';
+    render();
+  }
+  $('go').onclick=function(){watchId===null?start():stop()};
+  $('reset').onclick=function(){S.max=0;S.dist=0;S.moving=0;S.speed=0;S.last=null;render()};
+  function setUnit(u){unit=u;$('u-kmh').setAttribute('aria-pressed',u==='kmh');$('u-mph').setAttribute('aria-pressed',u==='mph');render()}
+  $('u-kmh').onclick=function(){setUnit('kmh')};
+  $('u-mph').onclick=function(){setUnit('mph')};
+  document.addEventListener('visibilitychange',function(){if(!document.hidden&&watchId!==null)lock()});
+  render();
+})();
+</script>
+</body>
+</html>
